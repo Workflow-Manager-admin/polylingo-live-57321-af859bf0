@@ -1,4 +1,5 @@
 /* FloatingCaptionOverlay integration */
+import './publicUrlShim.js';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import LanguageSelector from './LanguageSelector';
@@ -7,6 +8,8 @@ import { translateText, streamTranslateText } from './utils/translationApi';
 import TranslationDisplay from './components/TranslationDisplay';
 import HistoryPanel from './components/HistoryPanel';
 import FloatingCaptionOverlay from './components/FloatingCaptionOverlay';
+
+
 
 // Ensure PUBLIC_URL is defined as a global variable for template macro/build contexts
 if (typeof PUBLIC_URL === "undefined") {
