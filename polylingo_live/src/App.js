@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './App.css';
 import LanguageSelector from './LanguageSelector';
+import InputPanel from './InputPanel';
 
 // PUBLIC_INTERFACE
 function App() {
@@ -15,6 +16,14 @@ function App() {
     // Optionally reset input language if enabling auto-detect
     // if (checked) setInputLanguage('en');
   };
+
+  // Unified input state for text/voice
+  const [inputText, setInputText] = useState('');
+  // You may implement translation logic, output, and history later
+
+  // Optionally handle voice input events (e.g., for visual feedback, analytics)
+  const handleVoiceStart = () => {};
+  const handleVoiceEnd = () => {};
 
   return (
     <div className="app">
@@ -52,11 +61,12 @@ function App() {
               {/* Input Panel */}
               <section className="input-panel">
                 <div className="section-title">Input Panel</div>
-                <div className="section-placeholder">
-                  {/* Placeholder: Voice input button, text input box, mic icon, etc. */}
-                  [Text field]<br />
-                  [Voice input button/icon]
-                </div>
+                <InputPanel
+                  inputText={inputText}
+                  setInputText={setInputText}
+                  onVoiceStart={handleVoiceStart}
+                  onVoiceEnd={handleVoiceEnd}
+                />
               </section>
               {/* Translation Display Panel */}
               <section className="translation-panel">
