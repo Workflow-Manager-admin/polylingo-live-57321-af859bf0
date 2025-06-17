@@ -1,10 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-// PUBLIC_INTERFACE
-/**
+/** 
+ * PUBLIC_INTERFACE
  * Unified InputPanel for PolyLingo Live.
  * Provides both text and *continuous* voice input with start/stop capture (opt-in), clear mic-hot UI,
  * and continuous streaming via Web Speech API as long as enabled.
+ *
+ * Privacy Note:
+ * - Microphone is accessed ONLY after explicit user action (mic button press).
+ * - All voice data is handled in the browser and not transmitted externally by default.
+ * - The Web Speech API may surface browser permission prompts per user/browser policy.
  *
  * Props:
  * - inputText: string (controlled)

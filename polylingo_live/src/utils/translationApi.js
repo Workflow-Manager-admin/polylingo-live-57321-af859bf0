@@ -1,6 +1,11 @@
 //
 /**
  * Simulates a real-time translation API and a streaming translation API.
+ * 
+ * PRIVACY NOTE:  All translation logic runs on-device; no API calls are made to
+ * cloud or third-party services in this template/demo. 
+ * If you substitute this module for use with an external API,
+ * you are responsible for documenting privacy/consent changes in the UI.
  *
  * @param {Object} params
  * @param {string} params.text - The text to translate.

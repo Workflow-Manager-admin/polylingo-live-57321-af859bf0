@@ -7,6 +7,12 @@ import "./FloatingCaptionOverlay.css";
  * with branding, background, fade-in/out, and responsive styling, and can host
  * overlay control elements such as TTS toggle.
  * 
+ * Privacy/Security Notes:
+ * - The overlay only displays translation output from within the app; it cannot interact with or
+ *   capture content from other browser tabs, windows, or applications (strict web security model).
+ * - All overlay logic runs on-device, and no overlay information is transmitted off-device.
+ * - TTS in the overlay is user-controlled.
+ *
  * Props:
  * - open: boolean (controls visibility)
  * - text: string (caption/translation to display)

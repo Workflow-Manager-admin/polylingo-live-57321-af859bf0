@@ -9,6 +9,8 @@ import TranslationDisplay from './components/TranslationDisplay';
 import HistoryPanel from './components/HistoryPanel';
 import FloatingCaptionOverlay from './components/FloatingCaptionOverlay';
 
+
+
 // TTS helper function for mapping overlay language code (one central place)
 function getVoiceLang(code) {
   switch (code) {
