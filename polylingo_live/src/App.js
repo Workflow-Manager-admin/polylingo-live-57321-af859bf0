@@ -3,6 +3,7 @@ import './App.css';
 import LanguageSelector from './LanguageSelector';
 import InputPanel from './InputPanel';
 import { translateText } from './utils/translationApi';
+import TranslationDisplay from './components/TranslationDisplay';
 
 // PUBLIC_INTERFACE
 function App() {
@@ -140,22 +141,11 @@ function App() {
                 )}
                 {/* Show real translation output */}
                 {(!!Object.keys(translated).length && !error) && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {outputLanguages.map((lang) => (
-                      <div key={lang} style={{
-                        background: '#f3f6ff',
-                        borderRadius: 6,
-                        padding: '10px 13px',
-                        color: '#263152',
-                        fontSize: '1.08rem'
-                      }}>
-                        <span style={{ fontWeight: 600, color: '#4A90E2', marginRight: 10 }}>
-                          {lang.toUpperCase()}:
-                        </span>
-                        {translated[lang] || <span style={{ color: '#b5b5b5' }}>(no result)</span>}
-                      </div>
-                    ))}
-                  </div>
+                  <TranslationDisplay
+                    translations={translated}
+                    outputLanguages={outputLanguages}
+                    isTranslating={isTranslating}
+                  />
                 )}
                 </div>
               </section>
