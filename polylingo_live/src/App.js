@@ -1,4 +1,4 @@
-// FloatingCaptionOverlay integration
+/* FloatingCaptionOverlay integration */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import LanguageSelector from './LanguageSelector';
@@ -7,6 +7,14 @@ import { translateText } from './utils/translationApi';
 import TranslationDisplay from './components/TranslationDisplay';
 import HistoryPanel from './components/HistoryPanel';
 import FloatingCaptionOverlay from './components/FloatingCaptionOverlay';
+/* 
+ * PUBLIC_URL compatibility (noop shim for template/linter). 
+ * No direct usage found, but ensure this doesn't trigger lint/build errors.
+ */
+if (typeof PUBLIC_URL === 'undefined') {
+  // eslint-disable-next-line no-global-assign
+  window.PUBLIC_URL = '';
+}
 
 // PUBLIC_INTERFACE
 function App() {
@@ -14,6 +22,9 @@ function App() {
   const [autoDetect, setAutoDetect] = useState(true);
   const [inputLanguage, setInputLanguage] = useState('en'); // Default input language (irrelevant if autoDetect)
   const [outputLanguage, setOutputLanguage] = useState('es'); // Default output language
+
+  // Overlay & TTS language: independently chosen by user; defaults to outputLanguage
+  const [overlayTTSLanguage, setOverlayTTSLanguage] = useState('es');
 
   // Enable support for multiple output languages (future: UI for multi-select)
   const [outputLanguages, setOutputLanguages] = useState(['es']); // For now, just one, but use array
@@ -73,8 +84,8 @@ function App() {
 
   // Floating overlay state/logic
   const [showOverlay, setShowOverlay] = useState(false);
-  // We use first output language for now; future: let user choose which to show in overlay
-  const overlayLang = outputLanguages[0] || outputLanguage || "en";
+  // Use overlayTTSLanguage as the overlay language for both captions and TTS
+  const overlayLang = overlayTTSLanguage || outputLanguages[0] || outputLanguage || "en";
   const overlayText =
     (!!Object.keys(translated).length && translated[overlayLang])
       ? translated[overlayLang]
@@ -104,7 +115,40 @@ function App() {
               <span className="logo-symbol">L</span>
               <span style={{ fontWeight: 800, marginLeft: 2 }}>PolyLingo Live</span>
             </div>
-            <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <span style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              {/* Overlay/TTS Language quick control */}
+              <span style={{display: 'flex', alignItems: "center", gap: 7, marginRight: 2}}>
+                <label htmlFor="navbar-overlay-tts-lang" style={{ fontSize: ".93rem", fontWeight: 500, color: "#fafbff", marginRight: 4 }}>
+                  Overlay/TTS:
+                </label>
+                <select
+                  id="navbar-overlay-tts-lang"
+                  value={overlayTTSLanguage}
+                  onChange={(e) => setOverlayTTSLanguage(e.target.value)}
+                  style={{
+                    padding: "5px 10px",
+                    borderRadius: 5,
+                    border: "1.5px solid #eee",
+                    background: "#fff",
+                    color: "#2d435e",
+                    minWidth: 95,
+                    fontWeight: 500,
+                    fontSize: ".97rem"
+                  }}
+                  title="Language for overlay and text-to-speech"
+                >
+                  {/* Duplicate language list from LanguageSelector for user convenience */}
+                  <option value="en">English</option>
+                  <option value="es">Spanish</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="zh">Chinese</option>
+                  <option value="hi">Hindi</option>
+                  <option value="ar">Arabic</option>
+                  <option value="ja">Japanese</option>
+                  <option value="ru">Russian</option>
+                </select>
+              </span>
               <button className="btn"
                 aria-pressed={showOverlay}
                 style={{
@@ -135,11 +179,13 @@ function App() {
                 <LanguageSelector
                   inputLanguage={inputLanguage}
                   outputLanguage={outputLanguage}
+                  overlayTTSLanguage={overlayTTSLanguage}
                   onInputLanguageChange={setInputLanguage}
                   onOutputLanguageChange={(lang) => {
                     setOutputLanguage(lang);
                     setOutputLanguages([lang]);
                   }}
+                  onOverlayTTSLanguageChange={setOverlayTTSLanguage}
                   autoDetect={autoDetect}
                   onAutoDetectChange={handleAutoDetectChange}
                 />

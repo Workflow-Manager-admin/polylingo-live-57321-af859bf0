@@ -21,8 +21,10 @@ const MOCK_LANGUAGES = [
 function LanguageSelector({
   inputLanguage,
   outputLanguage,
+  overlayTTSLanguage,
   onInputLanguageChange,
   onOutputLanguageChange,
+  onOverlayTTSLanguageChange,
   autoDetect,
   onAutoDetectChange,
   languages = MOCK_LANGUAGES,
@@ -96,6 +98,7 @@ function LanguageSelector({
             color: "#333",
             minWidth: 120,
             cursor: "pointer",
+            marginRight: 10,
           }}
         >
           {languages.map((lang) => (
@@ -104,6 +107,48 @@ function LanguageSelector({
             </option>
           ))}
         </select>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <label
+          htmlFor="overlay-tts-language"
+          style={{
+            fontWeight: 500,
+            fontSize: "0.96rem",
+            marginRight: 10,
+          }}
+        >
+          Overlay &amp; TTS Language:
+        </label>
+        <select
+          id="overlay-tts-language"
+          value={overlayTTSLanguage}
+          onChange={(e) => onOverlayTTSLanguageChange(e.target.value)}
+          style={{
+            padding: "6px 12px",
+            borderRadius: 5,
+            border: "1px solid #e3e6ef",
+            background: "#fff",
+            color: "#454e5e",
+            minWidth: 120,
+            cursor: "pointer"
+          }}
+        >
+          {languages.map((lang) => (
+            <option value={lang.code} key={lang.code}>
+              {lang.name}
+            </option>
+          ))}
+        </select>
+        <span style={{
+          fontSize: "0.85rem",
+          color: "#687485",
+          marginLeft: 8,
+          background: "#f9fbfe",
+          borderRadius: 5,
+          padding: "2.5px 9px",
+        }}>
+          Controls language for floating overlay and speech
+        </span>
       </div>
       <div style={{ fontSize: "0.93rem", color: "#687485", marginTop: 10 }}>
         {autoDetect
