@@ -10,8 +10,9 @@ import React, { useState, useRef, useEffect } from 'react';
  * - inputText: string (controlled)
  * - setInputText: function (controlled setter)
  * - onVoiceStart/onVoiceEnd: optional callbacks
+ * - onSpeechStream: function (fragment: string, isFinal: boolean) => void
  */
-function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
+function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd, onSpeechStream }) {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState('');
   const [isSpeechSupported, setIsSpeechSupported] = useState(null);
@@ -37,16 +38,27 @@ function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
       finalTranscriptRef.current = '';
       recognition.onresult = (event) => {
         let interimTranscript = '';
+        let anyUpdate = false;
+        let newIsFinal = false;
         // Aggregate results
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
             finalTranscriptRef.current += event.results[i][0].transcript;
+            newIsFinal = true;
+            anyUpdate = true;
           } else {
             interimTranscript += event.results[i][0].transcript;
+            anyUpdate = true;
           }
         }
+        const fullText = finalTranscriptRef.current + interimTranscript;
         // Show interim as feedback for user while capturing
-        if (isMounted.current) setInputText(finalTranscriptRef.current + interimTranscript);
+        if (isMounted.current) setInputText(fullText);
+
+        // Stream live fragment to parent for continual translation (if supported)
+        if (onSpeechStream && anyUpdate) {
+          onSpeechStream(fullText, newIsFinal && !interimTranscript);
+        }
       };
 
       recognition.onerror = (event) => {

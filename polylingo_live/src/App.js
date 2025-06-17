@@ -3,10 +3,15 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import LanguageSelector from './LanguageSelector';
 import InputPanel from './InputPanel';
-import { translateText } from './utils/translationApi';
+import { translateText, streamTranslateText } from './utils/translationApi';
 import TranslationDisplay from './components/TranslationDisplay';
 import HistoryPanel from './components/HistoryPanel';
 import FloatingCaptionOverlay from './components/FloatingCaptionOverlay';
+
+// Ensure PUBLIC_URL is defined as a global variable for template macro/build contexts
+if (typeof PUBLIC_URL === "undefined") {
+  var PUBLIC_URL = "";
+}
 
 /* 
  * PUBLIC_URL compatibility (noop shim for template/linter).
@@ -46,12 +51,20 @@ function App() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState('');
 
+  // Live overlay streaming state
+  const [overlayLiveText, setOverlayLiveText] = useState('');
+  const voiceStreamingStateRef = useRef({
+    cancel: false,
+    prevText: '',
+    streamPromise: null,
+  });
+
   // Update outputLanguages when outputLanguage changes (single output model)
   useEffect(() => {
     setOutputLanguages([outputLanguage]);
   }, [outputLanguage]);
 
-  // Translate handler (for button and auto updates)
+  // Translate handler (for button and auto updates, not streaming)
   const handleTranslate = useCallback(async () => {
     if (!inputText.trim()) {
       setTranslated({});
@@ -74,24 +87,92 @@ function App() {
     setIsTranslating(false);
   }, [inputText, inputLanguage, outputLanguages, autoDetect]);
 
-  // Auto-translate on input change, language change, or autoDetect change
+  // Auto-translate on input change, language change, or autoDetect change (non-streaming, for text/manual use)
   useEffect(() => {
     if (inputText.trim() && outputLanguages.length > 0) handleTranslate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputText, inputLanguage, outputLanguages, autoDetect]);
 
-  // Optionally handle voice input events (e.g., for visual feedback, analytics)
-  const handleVoiceStart = () => {};
-  const handleVoiceEnd = () => {};
+  // Streaming pipeline for voice input and overlay: state is updated as user speaks
+  const handleSpeechStream = useCallback(
+    async (fragment, isFinal) => {
+      // New fragment arrives from InputPanel (voice recognition engine)
+      // Cancel previous ongoing stream if the fragment markedly decreases (i.e., user started new utterance)
+      if (
+        fragment.trim() === '' ||
+        (voiceStreamingStateRef.current.prevText &&
+          fragment.length < voiceStreamingStateRef.current.prevText.length - 4)
+      ) {
+        setOverlayLiveText('');
+        voiceStreamingStateRef.current.cancel = true;
+        voiceStreamingStateRef.current.prevText = '';
+        voiceStreamingStateRef.current.streamPromise = null;
+        if (isFinal) setTranslated({});
+        return;
+      }
+
+      // Cancel previous streaming promise if in flight and input advances
+      if (voiceStreamingStateRef.current.streamPromise) {
+        voiceStreamingStateRef.current.cancel = true;
+      }
+
+      voiceStreamingStateRef.current.cancel = false;
+      voiceStreamingStateRef.current.prevText = fragment;
+
+      const overlayStreamLang = overlayTTSLanguage || outputLanguages[0] || outputLanguage || 'en';
+      // Call simulated streaming translation API
+      const streamPromise = streamTranslateText({
+        text: fragment,
+        inputLanguage,
+        outputLanguages: [overlayStreamLang],
+        autoDetect,
+        onPartial: (partial) => {
+          // Only update overlay, not main translation panel
+          if (!voiceStreamingStateRef.current.cancel)
+            setOverlayLiveText((partial && partial[overlayStreamLang]) || '');
+        }
+      }).then(finalRes => {
+        // Set to last translation when utterance is marked as final
+        if (!voiceStreamingStateRef.current.cancel && isFinal) {
+          setOverlayLiveText((finalRes && finalRes[overlayStreamLang]) || '');
+          setTranslated((tr) => ({
+            ...tr,
+            ...finalRes,
+          }));
+        }
+        // Clean up handle after streaming
+        voiceStreamingStateRef.current.streamPromise = null;
+      });
+
+      voiceStreamingStateRef.current.streamPromise = streamPromise;
+    },
+    [overlayTTSLanguage, outputLanguages, outputLanguage, inputLanguage, autoDetect]
+  );
+
+  // Optionally handle voice input events (could be used for visual feedback, analytics)
+  const handleVoiceStart = () => {
+    // Clear overlay streaming state for new utterance
+    setOverlayLiveText('');
+    voiceStreamingStateRef.current.cancel = false;
+    voiceStreamingStateRef.current.prevText = '';
+    voiceStreamingStateRef.current.streamPromise = null;
+  };
+  const handleVoiceEnd = () => {
+    // Mark as finalized: keep last text, or clear immediately if you prefer.
+    // setOverlayLiveText('');
+    // If last partial was not final, you may want to flush/finalize here.
+  };
 
   // Floating overlay state/logic
   const [showOverlay, setShowOverlay] = useState(false);
   // Use overlayTTSLanguage as the overlay language for both captions and TTS
   const overlayLang = overlayTTSLanguage || outputLanguages[0] || outputLanguage || "en";
+  // For overlayText, prefer streaming state, fallback to original translation if overlay not streaming
   const overlayText =
-    (!!Object.keys(translated).length && translated[overlayLang])
+    overlayLiveText ||
+    ((!!Object.keys(translated).length && translated[overlayLang])
       ? translated[overlayLang]
-      : "";
+      : "");
 
   // Keyboard shortcut (Ctrl+Shift+O) to toggle overlay for power users
   useEffect(() => {
@@ -200,6 +281,7 @@ function App() {
                   setInputText={setInputText}
                   onVoiceStart={handleVoiceStart}
                   onVoiceEnd={handleVoiceEnd}
+                  onSpeechStream={handleSpeechStream}
                 />
               </section>
               {/* Translation Display Panel */}
