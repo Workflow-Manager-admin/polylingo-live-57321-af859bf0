@@ -3,49 +3,82 @@ import React, { useState, useRef, useEffect } from 'react';
 // PUBLIC_INTERFACE
 /**
  * Unified InputPanel for PolyLingo Live.
- * Provides both text and voice input with single 'inputText' state, error handling, 
- * and toggles recording via the Web Speech API if supported.
+ * Provides both text and *continuous* voice input with start/stop capture (opt-in), clear mic-hot UI,
+ * and continuous streaming via Web Speech API as long as enabled.
+ *
+ * Props:
+ * - inputText: string (controlled)
+ * - setInputText: function (controlled setter)
+ * - onVoiceStart/onVoiceEnd: optional callbacks
  */
 function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState('');
   const [isSpeechSupported, setIsSpeechSupported] = useState(null);
   const recognitionRef = useRef(null);
+  const isMounted = useRef(true);
+  const [isMicrophoneAccessDenied, setIsMicrophoneAccessDenied] = useState(false);
 
-  // Check for Web Speech API support
+  // Track continuous transcript
+  const finalTranscriptRef = useRef('');
+
   useEffect(() => {
+    isMounted.current = true;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     setIsSpeechSupported(!!SpeechRecognition);
+
     if (SpeechRecognition && !recognitionRef.current) {
       const recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
-      recognition.interimResults = false;
+      recognition.interimResults = true;
       recognition.maxAlternatives = 1;
-      recognition.continuous = false;
+      recognition.continuous = true;
 
+      finalTranscriptRef.current = '';
       recognition.onresult = (event) => {
-        if (event.results && event.results[0] && event.results[0][0]) {
-          setInputText(event.results[0][0].transcript);
+        let interimTranscript = '';
+        // Aggregate results
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscriptRef.current += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        // Show interim as feedback for user while capturing
+        if (isMounted.current) setInputText(finalTranscriptRef.current + interimTranscript);
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === "not-allowed" || event.error === "denied") {
+          setIsMicrophoneAccessDenied(true);
+          setError('Microphone access denied.');
+        } else {
+          setError('Voice recognition error: ' + event.error);
         }
         setIsListening(false);
         if (onVoiceEnd) onVoiceEnd();
       };
 
-      recognition.onerror = (event) => {
-        setError('Voice recognition error: ' + event.error);
-        setIsListening(false);
-        if (onVoiceEnd) onVoiceEnd();
-      };
-
       recognition.onend = () => {
-        setIsListening(false);
-        if (onVoiceEnd) onVoiceEnd();
+        // Only auto-restart if user has not stopped it (continuous mode)
+        if (isListening && !isMicrophoneAccessDenied) {
+          try {
+            recognition.start();
+          } catch (e) {
+            setIsListening(false);
+          }
+        } else {
+          setIsListening(false);
+          if (onVoiceEnd) onVoiceEnd();
+        }
       };
 
       recognitionRef.current = recognition;
     }
     // Cleanup: stop any ongoing recognition on unmount
     return () => {
+      isMounted.current = false;
       if (recognitionRef.current) {
         recognitionRef.current.onresult = null;
         recognitionRef.current.onerror = null;
@@ -56,6 +89,7 @@ function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
     // eslint-disable-next-line
   }, []);
 
+  // Start or stop continuous voice recognition on user action
   const handleMicClick = () => {
     setError('');
     if (!isSpeechSupported) {
@@ -64,10 +98,17 @@ function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
     }
     if (recognitionRef.current) {
       if (!isListening) {
-        recognitionRef.current.lang = 'en-US'; // Make language configurable as needed
+        setIsMicrophoneAccessDenied(false);
+        finalTranscriptRef.current = '';
+        recognitionRef.current.lang = 'en-US'; // (Future: can make configurable per language selection)
         setIsListening(true);
-        recognitionRef.current.start();
-        if (onVoiceStart) onVoiceStart();
+        try {
+          recognitionRef.current.start();
+          if (onVoiceStart) onVoiceStart();
+        } catch (e) {
+          setError('Could not start voice recognition: ' + e.message);
+          setIsListening(false);
+        }
       } else {
         recognitionRef.current.stop();
         setIsListening(false);
@@ -81,6 +122,12 @@ function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
   const handleInputChange = (e) => {
     setInputText(e.target.value);
     setError('');
+    // If user starts typing, stop listening
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      if (onVoiceEnd) onVoiceEnd();
+    }
   };
 
   return (
@@ -89,7 +136,7 @@ function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
         <input
           type="text"
           className="input-box"
-          placeholder={isListening ? 'Listening...' : 'Type your text or use the mic'}
+          placeholder={isListening ? 'Listening... (Press mic to stop)' : 'Type your text or use the mic'}
           value={inputText}
           onChange={handleInputChange}
           style={{
@@ -98,16 +145,17 @@ function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
             borderRadius: 6,
             border: '1px solid #c9d1df',
             fontSize: '1.03rem',
-            background: isListening ? '#e8f0fc' : '#fff',
-            outline: isListening ? '1.3px solid #4A90E2' : 'none',
+            background: isListening ? '#faf7e1' : '#fff',
+            outline: isListening ? '2px solid var(--accent)' : 'none',
             transition: 'all 0.15s'
           }}
-          disabled={isListening}
+          disabled={false}
         />
         <button
           type="button"
           onClick={handleMicClick}
           aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
+          aria-pressed={isListening}
           className="btn"
           style={{
             background: isListening ? 'var(--accent)' : 'var(--primary)',
@@ -115,36 +163,38 @@ function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
             borderRadius: '50%',
             width: 44,
             height: 44,
-            border: 'none',
+            border: isListening ? '2.3px solid #ffbb44' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: '1.45rem',
-            transition: 'background 0.18s',
-            boxShadow: isListening ? '0 1px 6px rgba(245,166,35,0.23)' : undefined,
+            position: "relative",
+            boxShadow: isListening ? '0 2px 11px rgba(245,166,35,0.21)' : undefined,
+            transition: 'background 0.18s, border 0.18s'
           }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center' }}>
             {isListening ? (
+              // "mic hot" (animate/pulse to indicate live audio)
               <svg viewBox="0 0 20 20" width={21} height={21} fill="currentColor">
-                <ellipse cx="10" cy="10" rx="5.3" ry="6" fill="var(--text-inverse)" opacity="0.14"/>
+                <ellipse cx="10" cy="10" rx="5.3" ry="6" fill="var(--text-inverse)" opacity="0.18"/>
                 <rect x="7.7" y="6" width="4.6" height="8" rx="2.3" fill="var(--text-inverse)" />
-                {/* Animated listening bars */}
                 <rect x="10.8" y="4" width="1.4" height="4" rx="0.6" fill="#F5A623">
-                  <animate 
-                    attributeName="height" values="4;8;4" dur="0.8s" repeatCount="indefinite"
-                    begin="0.3s"
+                  <animate
+                    attributeName="height" values="4;10;4" dur="0.8s" repeatCount="indefinite"
+                    begin="0.2s"
                   />
                 </rect>
                 <rect x="7.8" y="4" width="1.4" height="4" rx="0.6" fill="#4A90E2">
-                  <animate 
-                    attributeName="height" values="8;4;8" dur="0.8s" repeatCount="indefinite"
+                  <animate
+                    attributeName="height" values="10;4;10" dur="0.8s" repeatCount="indefinite"
                   />
                 </rect>
               </svg>
             ) : (
+              // Idle mic icon
               <svg viewBox="0 0 20 20" width={21} height={21} fill="currentColor">
-                <ellipse cx="10" cy="10" rx="5.3" ry="6" fill="var(--text-inverse)" opacity="0.14"/>
+                <ellipse cx="10" cy="10" rx="5.3" ry="6" fill="var(--text-inverse)" opacity="0.13"/>
                 <rect x="7.7" y="6" width="4.6" height="8" rx="2.3" fill="var(--text-inverse)" />
                 <rect x="10.8" y="7" width="1.4" height="5" rx="0.6" fill="#F5A623" />
                 <rect x="7.8" y="7" width="1.4" height="5" rx="0.6" fill="#4A90E2" />
@@ -152,6 +202,24 @@ function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
             )}
           </span>
         </button>
+        {/* Live indicator */}
+        {isListening && (
+          <span
+            style={{
+              marginLeft: 5,
+              padding: "2.5px 12px",
+              background: "#FBFBDC",
+              borderRadius: 7,
+              color: "#cb7407",
+              fontWeight: 600,
+              fontSize: "0.98rem",
+              letterSpacing: 0.15,
+              border: "1.5px solid var(--accent)"
+            }}
+          >
+            Mic is ON
+          </span>
+        )}
       </div>
       {error && (
         <div style={{ color: '#d52f24', fontSize: '0.97rem', marginTop: 8 }}>
@@ -167,8 +235,8 @@ function InputPanel({ inputText, setInputText, onVoiceStart, onVoiceEnd }) {
         {isSpeechSupported === false
           ? "Your browser does not support voice recognition."
           : isListening
-          ? "Listening... Speak now."
-          : "Type with your keyboard or use the mic button."}
+          ? "Listening (continuous)... You may speak as long as mic is ON."
+          : "Type with your keyboard or use the mic button to start voice input."}
       </div>
     </div>
   );

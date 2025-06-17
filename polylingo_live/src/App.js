@@ -7,14 +7,16 @@ import { translateText } from './utils/translationApi';
 import TranslationDisplay from './components/TranslationDisplay';
 import HistoryPanel from './components/HistoryPanel';
 import FloatingCaptionOverlay from './components/FloatingCaptionOverlay';
+
 /* 
- * PUBLIC_URL compatibility (noop shim for template/linter). 
+ * PUBLIC_URL compatibility (noop shim for template/linter).
  * No direct usage found, but ensure this doesn't trigger lint/build errors.
+ * This is just to avoid linter/template ReferenceErrors.
  */
-if (typeof PUBLIC_URL === 'undefined') {
-  // eslint-disable-next-line no-global-assign
+if (typeof window !== "undefined" && typeof window.PUBLIC_URL === "undefined") {
   window.PUBLIC_URL = '';
 }
+// Do not reference PUBLIC_URL as a bare identifier in code.
 
 // PUBLIC_INTERFACE
 function App() {
