@@ -1,3 +1,4 @@
+// FloatingCaptionOverlay integration
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import LanguageSelector from './LanguageSelector';
@@ -5,6 +6,7 @@ import InputPanel from './InputPanel';
 import { translateText } from './utils/translationApi';
 import TranslationDisplay from './components/TranslationDisplay';
 import HistoryPanel from './components/HistoryPanel';
+import FloatingCaptionOverlay from './components/FloatingCaptionOverlay';
 
 // PUBLIC_INTERFACE
 function App() {
@@ -69,6 +71,30 @@ function App() {
   const handleVoiceStart = () => {};
   const handleVoiceEnd = () => {};
 
+  // Floating overlay state/logic
+  const [showOverlay, setShowOverlay] = useState(false);
+  // We use first output language for now; future: let user choose which to show in overlay
+  const overlayLang = outputLanguages[0] || outputLanguage || "en";
+  const overlayText =
+    (!!Object.keys(translated).length && translated[overlayLang])
+      ? translated[overlayLang]
+      : "";
+
+  // Keyboard shortcut (Ctrl+Shift+O) to toggle overlay for power users
+  useEffect(() => {
+    const handler = (e) => {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "o"
+      ) {
+        setShowOverlay((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   return (
     <div className="app">
       <nav className="navbar">
@@ -78,7 +104,20 @@ function App() {
               <span className="logo-symbol">L</span>
               <span style={{ fontWeight: 800, marginLeft: 2 }}>PolyLingo Live</span>
             </div>
-            <span>
+            <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <button className="btn"
+                aria-pressed={showOverlay}
+                style={{
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                  background: showOverlay ? 'var(--accent)' : undefined,
+                  color: showOverlay ? '#222' : undefined,
+                  border: showOverlay ? '2px solid var(--primary)' : undefined
+                }}
+                onClick={() => setShowOverlay((v) => !v)}
+              >
+                {showOverlay ? "Hide Overlay" : "Show Overlay"}
+              </button>
               <button className="btn" style={{ fontWeight: 600, letterSpacing: 0.5 }}>
                 Try Demo
               </button>
@@ -162,6 +201,12 @@ function App() {
           </div>
         </div>
       </main>
+      <FloatingCaptionOverlay
+        open={showOverlay && !!overlayText}
+        text={overlayText}
+        language={overlayLang}
+        onClose={() => setShowOverlay(false)}
+      />
     </div>
   );
 }

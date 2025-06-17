@@ -11,10 +11,16 @@
   --text-inverse: #ffffff;
   --border-color: #e2eaf2;
 
+  /* Overlay-specific variables */
+  --overlay-bg: rgba(74,144,226,0.98);
+  --overlay-shadow: 0 8px 34px rgba(44,124,230,0.13);
+  --overlay-z: 9999;
+
   /* Legacy (Kavia) variables for fallback */
   --base-light: #4A90E2;
   --base-dark: #003366;
 }
+
 
 /* Application background */
 body {
