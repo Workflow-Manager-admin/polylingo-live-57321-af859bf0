@@ -1,8 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './App.css';
+import LanguageSelector from './LanguageSelector';
 
 // PUBLIC_INTERFACE
 function App() {
+  // State management for language selection and detection
+  const [autoDetect, setAutoDetect] = useState(true);
+  const [inputLanguage, setInputLanguage] = useState('en'); // Default input language (irrelevant if autoDetect)
+  const [outputLanguage, setOutputLanguage] = useState('es'); // Default output language
+
+  // Handler when the user toggles auto-detect checkbox
+  const handleAutoDetectChange = (checked) => {
+    setAutoDetect(checked);
+    // Optionally reset input language if enabling auto-detect
+    // if (checked) setInputLanguage('en');
+  };
+
   return (
     <div className="app">
       <nav className="navbar">
@@ -27,11 +40,14 @@ function App() {
               {/* Language Selector Panel */}
               <section className="language-panel">
                 <div className="section-title">Language Selection</div>
-                <div className="section-placeholder">
-                  {/* Placeholder: Language dropdown(s) (input/output), auto-detect toggle, etc. */}
-                  [Dropdowns for source/target languages]<br />
-                  [Auto-detect switch]
-                </div>
+                <LanguageSelector
+                  inputLanguage={inputLanguage}
+                  outputLanguage={outputLanguage}
+                  onInputLanguageChange={setInputLanguage}
+                  onOutputLanguageChange={setOutputLanguage}
+                  autoDetect={autoDetect}
+                  onAutoDetectChange={handleAutoDetectChange}
+                />
               </section>
               {/* Input Panel */}
               <section className="input-panel">
