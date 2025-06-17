@@ -9,7 +9,21 @@ import TranslationDisplay from './components/TranslationDisplay';
 import HistoryPanel from './components/HistoryPanel';
 import FloatingCaptionOverlay from './components/FloatingCaptionOverlay';
 
-
+// TTS helper function for mapping overlay language code (one central place)
+function getVoiceLang(code) {
+  switch (code) {
+    case "en": return "en-US";
+    case "es": return "es-ES";
+    case "fr": return "fr-FR";
+    case "de": return "de-DE";
+    case "zh": return "zh-CN";
+    case "hi": return "hi-IN";
+    case "ar": return "ar-SA";
+    case "ja": return "ja-JP";
+    case "ru": return "ru-RU";
+    default: return code;
+  }
+}
 
 // Ensure PUBLIC_URL is defined as a global variable for template macro/build contexts
 if (typeof PUBLIC_URL === "undefined") {
@@ -168,6 +182,9 @@ function App() {
 
   // Floating overlay state/logic
   const [showOverlay, setShowOverlay] = useState(false);
+  // Overlay TTS toggle
+  const [overlayTTSEnabled, setOverlayTTSEnabled] = useState(true);
+
   // Use overlayTTSLanguage as the overlay language for both captions and TTS
   const overlayLang = overlayTTSLanguage || outputLanguages[0] || outputLanguage || "en";
   // For overlayText, prefer streaming state, fallback to original translation if overlay not streaming
@@ -176,6 +193,108 @@ function App() {
     ((!!Object.keys(translated).length && translated[overlayLang])
       ? translated[overlayLang]
       : "");
+
+  // Is browser speech Synthesis supported?
+  const isSpeechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+
+  // --- Overlay TTS logic ---
+  // Speech synthesis state helpers for overlays (prevent repeat, per language, etc)
+  const overlayTTSRef = useRef({
+    lastText: "",
+    lastLang: "",
+    speaking: false,
+    utterInstance: null,
+  });
+
+  // Helper: Stop overlay TTS if needed
+  const cancelOverlaySpeech = () => {
+    try {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+    } catch (e) {/* ignore */}
+    overlayTTSRef.current.speaking = false;
+    overlayTTSRef.current.utterInstance = null;
+    overlayTTSRef.current.lastText = "";
+    overlayTTSRef.current.lastLang = "";
+  };
+
+  // Watch overlayTTS toggle, overlayText, overlayLang, showOverlay. Speak only if enabled and others valid.
+  useEffect(() => {
+    // Only speak if ON and visible, not empty, and supported
+    if (
+      overlayTTSEnabled &&
+      showOverlay &&
+      !!overlayText &&
+      !!overlayLang &&
+      isSpeechSupported
+    ) {
+      // Avoid repeated reads of same text/lang.
+      const last = overlayTTSRef.current;
+      if (
+        last.speaking &&
+        overlayText === last.lastText &&
+        overlayLang === last.lastLang
+      ) {
+        // Already speaking correct fragment - do nothing.
+        return;
+      }
+
+      // Cancel any ongoing overlay TTS if new fragment.
+      cancelOverlaySpeech();
+
+      const utter = new window.SpeechSynthesisUtterance(overlayText);
+      const targetLang = getVoiceLang(overlayLang);
+
+      // Find best matching voice
+      const voices = window.speechSynthesis.getVoices();
+      const match =
+        voices.find((v) => v.lang === targetLang) ||
+        voices.find((v) => v.lang.startsWith(overlayLang)) ||
+        voices.find((v) => v.lang.startsWith(targetLang.slice(0, 2))) ||
+        voices[0];
+
+      if (match) utter.voice = match;
+      utter.lang = targetLang;
+
+      utter.onend = () => {
+        overlayTTSRef.current.speaking = false;
+      };
+      utter.onerror = () => {
+        overlayTTSRef.current.speaking = false;
+      };
+
+      // Only speak if not already spoken for this fragment
+      window.speechSynthesis.speak(utter);
+      overlayTTSRef.current = {
+        lastText: overlayText,
+        lastLang: overlayLang,
+        speaking: true,
+        utterInstance: utter,
+      };
+    } else {
+      // Conditions not met: cancel any ongoing overlay speech
+      if (overlayTTSRef.current.speaking) {
+        cancelOverlaySpeech();
+      }
+    }
+    // eslint-disable-next-line
+  }, [overlayText, overlayLang, showOverlay, overlayTTSEnabled, isSpeechSupported]);
+
+  // Clean up TTS when overlay closes or unmounts
+  useEffect(() => {
+    return () => {
+      cancelOverlaySpeech();
+    }
+    // eslint-disable-next-line
+  }, []);
+
+  // Cancel overlay TTS if overlay is hidden
+  useEffect(() => {
+    if (!showOverlay || !overlayTTSEnabled) {
+      cancelOverlaySpeech();
+    }
+    // eslint-disable-next-line
+  }, [showOverlay, overlayTTSEnabled]);
+
 
   // Keyboard shortcut (Ctrl+Shift+O) to toggle overlay for power users
   useEffect(() => {
@@ -339,6 +458,9 @@ function App() {
         text={overlayText}
         language={overlayLang}
         onClose={() => setShowOverlay(false)}
+        ttsEnabled={overlayTTSEnabled}
+        onTTSChanged={setOverlayTTSEnabled}
+        isSpeechSupported={isSpeechSupported}
       />
     </div>
   );
