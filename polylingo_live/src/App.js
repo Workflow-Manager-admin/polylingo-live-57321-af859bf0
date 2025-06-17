@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import LanguageSelector from './LanguageSelector';
 import InputPanel from './InputPanel';
 import { translateText } from './utils/translationApi';
 import TranslationDisplay from './components/TranslationDisplay';
+import HistoryPanel from './components/HistoryPanel';
 
 // PUBLIC_INTERFACE
 function App() {
